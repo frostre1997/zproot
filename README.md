@@ -19,12 +19,14 @@ zproot is a work in progress. The core tracer is being written from scratch in Z
 | M1: ptrace syscall loop | done |
 | M2: Read syscall arguments | done |
 | M3: Path rewriting (openat) | done |
-| M4: execve / ELF interpreter | done |
+| M4: Longer path via stack scratch | done |
 | M5: openat2, statx | done |
-| M6: Android seccomp / SIGSYS | in progress |
-| M7: aarch64-linux-android build | planned |
+| M6: Android seccomp / SIGSYS | done |
+| M7: aarch64-linux-android build | done |
+| M8: Android APK with path redirect | done |
+| M9: Rootfs prefix, Alpine install | in progress |
 
-Keep in mind that this is a beta so don't expect a working APK yet. If you need something usable today, use pr or Termux.
+The APK lives at [zproot/zproot-android](https://github.com/zproot/zproot-android). If you need something usable today, use [pr](https://github.com/oonid/pr) or [Termux](https://github.com/termux/termux-app).
 
 ## Supported distributions (target)
 
@@ -32,7 +34,7 @@ Alpine, Debian, Ubuntu, Arch Linux, Fedora, OpenSUSE, Manjaro, Rocky Linux
 
 ## How it works
 
-zproot uses Linux ptrace() to intercept syscalls and translate filesystem paths, creating a virtual root filesystem without actual root privileges.
+zproot sits between a Linux program and the Android kernel. It uses Linux `ptrace()` to intercept syscalls and translate filesystem paths, creating a virtual root filesystem without actual root privileges. When the guest calls `openat("/etc/passwd")`, zproot rewrites the syscall argument to point at `/data/data/com.zproot/files/rootfs/etc/passwd`. The kernel opens the real file. The guest sees `/etc/passwd`.
 
 ## The app will bundle:
 
@@ -118,26 +120,125 @@ adb shell run-as com.zproot files/usr/bin/zproot-cli test debian
 
 ```
 zproot/
-├── build.zig              # Build graph
-├── src/
-│   ├── main.zig           # CLI entry point
-│   ├── trace.zig          # ptrace loop
-│   ├── syscall.zig        # Syscall number tables (x86_64, aarch64)
-│   ├── regs.zig           # Register access (arch-specific)
-│   ├── path.zig           # Path translation
-│   └── seccomp.zig        # SIGSYS handlers (M6)
-├── android/               # APK (Kotlin + Compose + JNI) — planned
-└── docs/
-    └── design.md          # Architecture and clean-room notes
+├── src/                       # Tracer source
+│   ├── main.zig               # CLI entry, argument parsing, ptrace loop
+│   ├── trace.zig              # ptrace loop, entering/exiting logic
+│   ├── regs.zig               # Register access (x86_64, aarch64)
+│   ├── memory.zig             # readCString, writeCString, process_vm_readv
+│   ├── syscall.zig            # Syscall number tables per architecture
+│   ├── path.zig               # Rootfs prefix, passthrough list
+│   ├── exec.zig               # doFork, execvpZ
+│   └── seccomp.zig            # SIGSYS handler
+├── native/                    # Architecture-specific assembly and linker scripts
+│   ├── aarch64/
+│   ├── x86_64/
+│   ├── arm/
+│   ├── asm/
+│   └── linker/
+├── build/                     # Build system configs
+│   ├── zig/
+│   ├── ci/
+│   ├── targets/
+│   └── scripts/
+├── scripts/                   # Automation scripts
+│   ├── build/
+│   ├── test/
+│   ├── release/
+│   ├── ci/
+│   ├── dev/
+│   ├── format/
+│   ├── lint/
+│   ├── deploy/
+│   └── install/
+├── test/                      # Tests
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   ├── fuzz/
+│   ├── fixtures/
+│   ├── helpers/
+│   ├── benchmarks/
+│   ├── snapshots/
+│   └── regression/
+├── docs/                      # Documentation
+│   ├── architecture/
+│   ├── adr/
+│   ├── api/
+│   ├── design/
+│   ├── native/
+│   ├── android/
+│   ├── security/
+│   ├── troubleshooting/
+│   ├── roadmap/
+│   ├── tutorials/
+│   ├── reference/
+│   ├── contributing/
+│   └── clean-room.md          # Clean-room methodology (required for MIT)
+├── examples/                  # Minimal usage examples
+│   ├── minimal/
+│   ├── redirect/
+│   ├── rootfs/
+│   ├── seccomp/
+│   └── execve/
+├── tools/                     # Custom developer tools
+│   ├── trace-viewer/
+│   ├── syscall-table-gen/
+│   ├── binary-inspector/
+│   ├── register-dump/
+│   ├── disasm/
+│   └── elf-inspector/
+├── third-party/               # Vendored dependencies
+│   ├── zig-wayland/
+│   ├── zig-wlroots/
+│   ├── zig-android/
+│   ├── licenses/
+│   └── notices/
+├── patches/                   # Patches to dependencies
+│   ├── upstream/
+│   ├── custom/
+│   └── archived/
+├── dist/                      # Distribution artifacts
+│   ├── apk/
+│   ├── tarballs/
+│   ├── musl/
+│   ├── android/
+│   └── checksums/
+├── releases/                  # Release management
+│   ├── v0.1/
+│   ├── templates/
+│   └── changelog/
+├── assets/                    # Runtime assets
+│   ├── terminfo/
+│   ├── shell-init/
+│   ├── motd/
+│   └── fonts/
+├── configs/                   # Editor and linter configs
+│   ├── editorconfig/
+│   ├── formatting/
+│   ├── linters/
+│   └── hooks/
+├── .github/                   # GitHub configuration
+│   ├── workflows/
+│   ├── actions/
+│   ├── ISSUE_TEMPLATE/
+│   ├── PULL_REQUEST_TEMPLATE/
+│   ├── CODEOWNERS/
+│   ├── FUNDING/
+│   ├── SECURITY/
+│   ├── dependabot/
+│   └── profile/
+├── build.zig                  # Build graph
+├── LICENSE
+└── README.md
 ```
+
+Android frontend lives at [zproot/zproot-android](https://github.com/zproot/zproot-android).
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| docs/design.md | Architecture, ptrace strategy, and clean-room methodology |
 | docs/clean-room.md | What sources were consulted and what was avoided (required for MIT) |
-| docs/android-compat.md | W^X, SELinux, and seccomp notes (to be written at M6) |
 
 ## Clean-room statement
 
@@ -152,10 +253,10 @@ This is what allows zproot to be released under the MIT license while the upstre
 
 ## Credits
 
-- [proot](https://github.com/proot-me/proot) — the original concept and design (GPL-2.0). Not used as source.
-- [termux-proot]() — Android patch inspiration (GPL-2.0). Not used as source.
-- [proot-distro](https://github.com/termux/proot-distro) — distribution plugin design (GPL-3.0). Not used as source.
-- [Zig](https://github.com/ziglang/zig) — the language and toolchain.
+- proot — the original concept and design (GPL-2.0). Not used as source.
+- termux-proot — Android patch inspiration (GPL-2.0). Not used as source.
+- proot-distro — distribution plugin design (GPL-3.0). Not used as source.
+- Zig — the language and toolchain.
 
 ## License
 
