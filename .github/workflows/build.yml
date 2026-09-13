@@ -1,0 +1,45 @@
+name: zproot
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build zproot for Android
+        run: zig build -Dtarget=aarch64-linux-android -Doptimize=ReleaseSafe
+
+      - name: Copy binary into jniLibs
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          cp zig-out/bin/zproot android/app/src/main/jniLibs/arm64-v8a/libzproot.so
+          chmod +x android/app/src/main/jniLibs/arm64-v8a/libzproot.so
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: zproot-apk
+          path: android/app/build/outputs/apk/release/*.apk
