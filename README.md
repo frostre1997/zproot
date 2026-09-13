@@ -69,8 +69,7 @@ The upstream proot is a mature but complex C codebase (~90 source files). Rewrit
 
 Prerequisites
 
-- Zig 0.13.0 or later
-- Android SDK with NDK r27c
+- Zig 0.16.0
 - Java 17+ (for the APK, once it exists)
 
 ## Build steps (host, x86_64 Linux)
@@ -78,7 +77,7 @@ Prerequisites
 ```bash
 
 # Clone
-git clone https://github.com/frostre1997/zproot
+git clone https://github.com/zproot/zproot
 cd zproot
 
 # Build the tracer
