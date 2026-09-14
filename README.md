@@ -62,7 +62,7 @@ Android enforces several restrictions on app processes that a tracer must work a
 The upstream proot is a mature but complex C codebase (~90 source files). Rewriting it in Zig gives us:
 
 - Direct syscall control via std.os.linux and inline asm, without an FFI layer
-- Built-in Android cross-compilation — zig build -Dtarget=aarch64-linux-android just works
+- Built-in Android cross-compilation — `zig build -Dtarget=aarch64-linux-android` just works
 - Compile-time code generation (comptime) for multi-architecture register handling
 - Small static binary — no runtime, no libc baggage if we want it
 - Clean-room licensing — MIT, because we own the copyright outright
